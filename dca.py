@@ -69,12 +69,19 @@ class (ScriptStrategyBase):
             logger.info(f"#{user_id}:{ex} unit_size: {unit_size:.2f} this unit size is less than exchange minimal amount")
             return  
 
-        # total = self.connectors[self.config.exchange].get_balance("total")
-        # token_value = token_balance * token_index_price
+        # open position
         last_price = rdb.get(f"dca:{user_id}:{ex}:{token}:long:price")
         if not last_price:
-            logger.error(f"#{user_id}:{ex} no last_price for {token}")
-            return
+            logger.info(f"#{user_id}:{ex} open position {token}")
+            buy_order = OrderCandidate(
+                trading_pair=self.config.trading_pair, 
+                is_maker=True, 
+                order_type=OrderType.LIMIT,
+                order_side=TradeType.BUY, 
+                amount=Decimal(unit_size), 
+                price=last_price
+            )
+            return buy_order
 
         # increase position
         ratio = (last_price - token_index_price) / last_price
@@ -93,7 +100,7 @@ class (ScriptStrategyBase):
         # decrease position
         entry_price = rdb.get(f"dca:{user_id}:{ex}:{token}:long:entry_price")
         ratio = (entry_price - token_index_price) / entry_price
-        if ratio > self.config.add_position_step_ratio
+        if ratio > self.config.min_profit_percent
             logger.info
             (f"#{user_id}:{ex} increase position {token}")
             sell_order = OrderCandidate(
@@ -125,6 +132,7 @@ class (ScriptStrategyBase):
     def did_fill_order(self, event: OrderFilledEvent):
         msg = (f"{event.trade_type.name} {round(event.amount, 2)} {event.trading_pair} {self.config.exchange} at {round(event.price, 2)}")
 
+        rdb.set(f"dca:{user_id}:{ex}:{token}:long:last_price", event.price)
         entry_price = rdb.get(f"dca:{user_id}:{ex}:{token}:long:entry_price")
         accumulate_amount = rdb.get(f"dca:{user_id}:{ex}:{token}:long:accumulate_amount")
         if event.order_type == buy:
