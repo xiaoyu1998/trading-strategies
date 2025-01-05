@@ -67,13 +67,13 @@ class (ScriptStrategyBase):
         if max_size > 0 and unit_size > max_size:
             unit_size = max_size
         if unit_size < MIN_SPOT_AMOUNT:
-            logger.info(f"#{user_id}:{ex} unit_size: {unit_size:.2f} this unit size is less than exchange minimal amount")
+            logger.info(f"#{self.user_id}:{self.config.exchange} unit_size: {unit_size:.2f} this unit size is less than exchange minimal amount")
             return  
 
         # open position
-        last_price = rdb.get(f"dca:{user_id}:{ex}:{token}:long:price")
+        last_price = rdb.get(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:price")
         if not last_price:
-            logger.info(f"#{user_id}:{ex} open position {token}")
+            logger.info(f"#{self.user_id}:{self.config.exchange} open position {self.token}")
             buy_order = OrderCandidate(
                 trading_pair=self.config.trading_pair, 
                 is_maker=True, 
@@ -87,7 +87,7 @@ class (ScriptStrategyBase):
         # increase position
         ratio = (last_price - token_index_price) / last_price
         if ratio < -(self.config.add_position_step_ratio):
-            logger.info(f"#{user_id}:{ex} increase position {token}")
+            logger.info(f"#{self.user_id}:{self.config.exchange} increase position {self.token}")
             buy_order = OrderCandidate(
                 trading_pair=self.config.trading_pair, 
                 is_maker=True, 
@@ -99,11 +99,11 @@ class (ScriptStrategyBase):
             return buy_order
 
         # decrease position
-        entry_price = rdb.get(f"dca:{user_id}:{ex}:{token}:long:entry_price")
+        entry_price = rdb.get(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:entry_price")
         ratio = (entry_price - token_index_price) / entry_price
         if ratio > self.config.min_profit_percent
             logger.info
-            (f"#{user_id}:{ex} increase position {token}")
+            (f"#{self.user_id}:{self.config.exchange} increase position {self.token}")
             sell_order = OrderCandidate(
                 trading_pair=self.config.trading_pair, 
                 is_maker=True, 
@@ -136,18 +136,18 @@ class (ScriptStrategyBase):
     def did_fill_order(self, event: OrderFilledEvent):
         msg = (f"{event.trade_type.name} {round(event.amount, 2)} {event.trading_pair} {self.config.exchange} at {round(event.price, 2)}")
 
-        rdb.set(f"dca:{user_id}:{ex}:{token}:long:last_price", event.price)
-        entry_price = rdb.get(f"dca:{user_id}:{ex}:{token}:long:entry_price")
-        accumulate_amount = rdb.get(f"dca:{user_id}:{ex}:{token}:long:accumulate_amount")
+        rdb.set(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:last_price", event.price)
+        entry_price = rdb.get(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:entry_price")
+        accumulate_amount = rdb.get(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:accumulate_amount")
         if event.order_type == buy:
             accumulate_amount += event.amount
             new_entry_price = (entry_price*accumulate_amount + event.amount*event.price)/ accumulate_amount
-            rdb.set(f"dca:{user_id}:{ex}:{token}:long:entry_price", new_entry_price)
-            rdb.set(f"dca:{user_id}:{ex}:{token}:long:accumulate_amount", accumulate_amount)
+            rdb.set(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:entry_price", new_entry_price)
+            rdb.set(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:accumulate_amount", accumulate_amount)
 
         if event.order_type == sell:
             accumulate_amount -= event.amount
-            rdb.set(f"dca:{user_id}:{ex}:{token}:long:accumulate_amount", accumulate_amount)
-            rdb.set(f"dca:{user_id}:{ex}:{token}:long:entry_price", entry_price)
+            rdb.set(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:accumulate_amount", accumulate_amount)
+            rdb.set(f"dca:{self.user_id}:{self.config.exchange}:{self.token}:long:entry_price", entry_price)
         self.log_with_clock(logging.INFO, msg)
         self.notify_hb_app_with_timestamp(msg)
