@@ -50,6 +50,7 @@ class (ScriptStrategyBase):
 
     def on_tick(self):
         if self.create_timestamp <= self.current_timestamp:
+            self.cancel_all_orders()
             proposal: List[OrderCandidate] = self.create_proposal()
             proposal_adjusted: List[OrderCandidate] = self.adjust_proposal_to_budget(proposal)
             self.place_orders(proposal_adjusted)
@@ -128,7 +129,10 @@ class (ScriptStrategyBase):
         elif order.order_side == TradeType.BUY:
             self.buy(connector_name=connector_name, trading_pair=order.trading_pair, amount=order.amount,
                      order_type=order.order_type, price=order.price)
-
+    def cancel_all_orders(self):
+        for order in self.get_active_orders(connector_name=self.config.exchange):
+            self.cancel(self.config.exchange, order.trading_pair, order.client_order_id)
+            
     def did_fill_order(self, event: OrderFilledEvent):
         msg = (f"{event.trade_type.name} {round(event.amount, 2)} {event.trading_pair} {self.config.exchange} at {round(event.price, 2)}")
 
@@ -145,7 +149,5 @@ class (ScriptStrategyBase):
             accumulate_amount -= event.amount
             rdb.set(f"dca:{user_id}:{ex}:{token}:long:accumulate_amount", accumulate_amount)
             rdb.set(f"dca:{user_id}:{ex}:{token}:long:entry_price", entry_price)
-
-
         self.log_with_clock(logging.INFO, msg)
         self.notify_hb_app_with_timestamp(msg)
